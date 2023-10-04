@@ -25,8 +25,8 @@ CREATE TABLE Profile (
     email VARCHAR(128), -- base64 encryt
     cj_world_account VARCHAR(30), -- base64 encryt
     join_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE ,
-    authentication_level VARCHAR(20) NOT NULL DEFAULT 'User', -- 'User'/'Admin'
+    update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    authentication_level VARCHAR(20) NOT NULL, -- 'User'/'Admin'
     FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
 );
 
