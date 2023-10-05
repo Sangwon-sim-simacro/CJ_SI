@@ -25,29 +25,30 @@ def create_token():
 
     # check user exist
     corsor_m.execute(f"SELECT user_no FROM users WHERE user_name = ?", (rq['user_name'],))
-    user_no = corsor_m.fetchone()
-    if (user_no) is not None: return "User name not exist", 400
+    user_no = corsor_m.fetchone() # (user_no,)
+    user_no = user_no[0]
+    if (user_no) is None: return "User name not exist", 400
 
     # check authorize
     if (rq['login_type']) == 'EXCEPT':
-        corsor_a.execute(f"SELECT * FROM password WHERE user_no = ?", (rq['user_no'],))
-        pw_row = corsor_m.fetchone() # (password_id, user_no, salt, update_date, password)
+        corsor_a.execute(f"SELECT * FROM password WHERE user_no = ?", (user_no,))
+        pw_row = corsor_a.fetchone() # (password_id, user_no, salt, update_date, password)
         pw = sha256( rq['pw'] + pw_row[2] ) # check pw
         if pw == pw_row[4] : pass 
         else : return 'Id or Password is not valid', 401
     elif (rq['login_type']) == 'SSO': pass
     else: return "Bad Request", 404
 
-    # create access token with secret_key
-    access_token = create_token("access_token")
+    # create access token
+    payload = {'exp':datetime.datetime.utcnow() + datetime.timedelta(seconds = 300), 'user_id':'test'}
+    access_token = create_token_per_type(payload)
 
     # save refresh token to db
-    refresh_token = create_token("refresh_token")
+    refresh_token = create_token_per_type()
     insert_tuple = (user_no, refresh_token)
-    insert_query = f"INSERT INTO users (user_no, refresh_token) VALUES (%s, %s)"
+    insert_query = f"INSERT INTO refresh_token (user_no, refresh_token) VALUES (%s, %s)"
     corsor_a.execute(insert_query, insert_tuple)
     conn_a.commit()
-
 
     # return access token , refresh token
     return refresh_access_token_response(access_token, refresh_token)
@@ -55,8 +56,19 @@ def create_token():
 
 @app.route('/token/verify', methods=['POST'])
 def verify_token():
+    rq = request.get_json()
+    decoded_token = verify_access_token(rq['access_token'])
 
-    return json.dumps()
+    if decoded_token == {} :
+        return "Access Token is not valid",401
+    else :
+        return json.dumps(decoded_token)
+    
+@app.route('/token/refresh', methods=['POST'])
+def refresh_token():
+    rq = request.get_json()
+    refresh_token = 1
+    
 
 #User
 @app.route('/users', methods=['POST'])

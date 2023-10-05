@@ -19,22 +19,12 @@ def get_db_conn (db_name):
     conn = mariadb.connect(user=DB_USER,password=DB_PASSWORD,host=DB_HOST,port=DB_PORT,database=db_name)
     return conn
 
-def create_token(token_type):
-    if token_type == "access_token" :
-        expire_time = 300
-    elif token_type == "refresh_token" :
-        expire_time = 60*60*24
-    else : 
-        expire_time = 300
-        
-    encoded = jwt.encode(
-        payload = {'exp':datetime.datetime.utcnow() + datetime.timedelta(seconds = 300)},
-        key = PRIVATE_KEY, 
-        algorithm = 'HS256')
+def create_token_per_type(payload = {'exp':datetime.datetime.utcnow() + datetime.timedelta(seconds = 24*60*60)}):
+    encoded = jwt.encode(payload = payload,key = PRIVATE_KEY, algorithm = 'HS256')
     token = encoded.decode('utf-8')
     return token
 
-def verify_token( token ):
+def verify_access_token( token ):
     try :
         decoded_token = jwt.decode(token, PRIVATE_KEY, algorithms=['HS256'])
         return decoded_token
