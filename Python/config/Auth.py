@@ -1,6 +1,6 @@
 import base64, random, hashlib
 import mariadb
-from Database import *
+from .Database import *
 
 def get_salt () :
     ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

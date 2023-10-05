@@ -36,6 +36,7 @@ CREATE TABLE Password (
     user_no INT,
     salt VARCHAR(128),
     update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, 
+    password VARCHAR(128),
     FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
 );
 
