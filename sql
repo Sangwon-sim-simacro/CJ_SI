@@ -39,6 +39,13 @@ CREATE TABLE Password (
     password VARCHAR(128),
     FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
 );
+CREATE TABLE Refresh_token (
+    refresh_token_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_no INT,
+    update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    refresh_token VARCHAR(256),
+    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
+);
 
 use CJ_Websim_Log;
 CREATE TABLE User_activity_log (
