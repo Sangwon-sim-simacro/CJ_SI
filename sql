@@ -1,13 +1,13 @@
 use mysql;
 CREATE DATABASE CJ_Websim_Member;
--- CREATE DATABASE CJ_Websim_Auth;
+CREATE DATABASE CJ_Websim_Auth;
 CREATE DATABASE CJ_Websim_Log;
 CREATE DATABASE CJ_Websim_Dormant;
 CREATE DATABASE CJ_Websim_Withdrawal;
 
--- CREATE USER 'cjwebsim'@'localhost' IDENTIFIED BY 'iG!8A4#YnP';
+CREATE USER 'cjwebsim'@'localhost' IDENTIFIED BY 'iG!8A4#YnP';
 GRANT ALL PRIVILEGES ON CJ_Websim_Member.* TO 'cjwebsim'@'localhost';
--- GRANT ALL PRIVILEGES ON CJ_Websim_Auth.* TO 'cjwebsim'@'localhost';
+GRANT ALL PRIVILEGES ON CJ_Websim_Auth.* TO 'cjwebsim'@'localhost';
 GRANT ALL PRIVILEGES ON CJ_Websim_Log.* TO 'cjwebsim'@'localhost';
 GRANT ALL PRIVILEGES ON CJ_Websim_Dormant.* TO 'cjwebsim'@'localhost';
 GRANT ALL PRIVILEGES ON CJ_Websim_Withdrawal.* TO 'cjwebsim'@'localhost';
@@ -27,7 +27,7 @@ CREATE TABLE Profile (
     join_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     authentication_level VARCHAR(20) NOT NULL, -- 'User'/'Admin'
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
+    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no) ON DELETE CASCADE
 );
 
 use CJ_Websim_Auth;
@@ -37,24 +37,24 @@ CREATE TABLE Password (
     salt VARCHAR(128),
     update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, 
     password VARCHAR(128),
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
+    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no) ON DELETE CASCADE
 );
 CREATE TABLE Refresh_token (
     refresh_token_id INT AUTO_INCREMENT PRIMARY KEY,
     user_no INT,
     update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     refresh_token VARCHAR(256),
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
+    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no) ON DELETE CASCADE
 );
 
 use CJ_Websim_Log;
 CREATE TABLE User_activity_log (
     user_activity_log_id INT AUTO_INCREMENT PRIMARY KEY,
     user_no INT,
-    menu_name VARCHAR(30),
-    calculation_log VARCHAR(256), -- 
-    log_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
+    user_name VARCHAR(20),
+    action_type VARCHAR(10), -- CALULATION / LOGIN / MENU
+    meta_data VARCHAR(256), -- calculation log / status code / menu name
+    log_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE Db_activity_log (
     db_activity_log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -65,22 +65,21 @@ CREATE TABLE Db_activity_log (
     as_is VARCHAR(256),
     to_be VARCHAR(256),
     modifier TINYINT DEFAULT 1, -- 1:user,2:admin,3:etc
-    log_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no)
+    log_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE Withdrawal_log (
     withdrawal_log_id INT AUTO_INCREMENT PRIMARY KEY,
     user_no INT,
-    withdrawl_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no) 
+    user_name VARCHAR(20),
+    withdrawl_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE Login_log (
     login_log_id INT AUTO_INCREMENT PRIMARY KEY,
     user_no INT,
+    user_name VARCHAR(20),
     status_code TINYINT, -- 0: Fail, 1: Success
     ip VARCHAR(15),
     -- fail_count TINYINT,
     -- fail_reason TINYINT,
-    login_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no) 
+    login_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

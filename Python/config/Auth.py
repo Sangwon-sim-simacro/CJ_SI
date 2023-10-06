@@ -24,13 +24,21 @@ def create_token_per_type(payload = {'exp':datetime.datetime.utcnow() + datetime
     token = encoded.decode('utf-8')
     return token
 
-def verify_access_token( token ):
+# token expire or invalid token then return {}
+def decode_token( token ):
     try :
         decoded_token = jwt.decode(token, PRIVATE_KEY, algorithms=['HS256'])
+        if decoded_token['exp'] < datetime.datetime.utcnow() : raise Exception("Token expired")
         return decoded_token
     except :
         return {}
-    
+
+def verify_token(access_token):
+    decoded_token = decode_token(access_token)
+    if decoded_token == {} :
+        return "Access Token is not valid",401
+    else :
+        return (decoded_token) 
 
 def refresh_access_token_response( access_token, refresh_token):
     response_data = jsonify({"access_token" : access_token})
