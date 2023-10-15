@@ -5,6 +5,7 @@ from flask_cors import CORS
 import requests, datetime,secrets, json
 import mariadb, jwt
 
+
 app = Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
@@ -43,6 +44,7 @@ def create_token():
             insert_tuple = (user_no, rq['user_name'], 0, rq['ip'])
             insert_query = f"INSERT INTO login_log (user_no, user_name, status_code, ip) VALUES (%s, %s, %d, %s)"
             corsor_l.execute(insert_query, insert_tuple)
+            conn_l.commit()
             return 'Id or Password is not valid', 401
     elif (rq['login_type']) == 'SSO': pass
     else: 
@@ -50,6 +52,7 @@ def create_token():
         insert_tuple = (user_no, rq['user_name'], 0, rq['ip'])
         insert_query = f"INSERT INTO login_log (user_no, user_name, status_code, ip) VALUES (%s, %s, %d, %s)"
         corsor_l.execute(insert_query, insert_tuple)
+        conn_l.commit()
         return "Bad Request", 404
     
     # get user information for inserting accesstoken
@@ -57,8 +60,8 @@ def create_token():
     profile_row = corsor_m.fetchone() # (user_no, cell_phone, email, cj_world_account, join_date, update_date, authentication_level)
 
     # create access token
-    payload = {'exp':datetime.datetime.utcnow() + datetime.timedelta(seconds = 300), 'user_no':user_no, 'cell_phone':profile_row[1],'email':profile_row[2]
-               ,'cj_world_account':profile_row[3],'authentication_level':profile_row[6]}
+    payload = {'exp':get_time_now() + datetime.timedelta(hours= 24), 'user_no':user_no, 'cell_phone':profile_row[2],'email':profile_row[3]
+               ,'cj_world_account':profile_row[3],'authentication_level':profile_row[7], "user_name":profile_row[8]}
     access_token = create_token_per_type(payload)
 
     # save refresh token to db
@@ -66,6 +69,8 @@ def create_token():
     insert_tuple = (user_no, refresh_token)
     insert_query = f"INSERT INTO refresh_token (user_no, refresh_token) VALUES (%s, %s)"
     corsor_a.execute(insert_query, insert_tuple)
+
+    conn_a.commit()
 
     #Login log insert (success)
     insert_tuple = (user_no, rq['user_name'], 1, rq['ip'])
@@ -77,11 +82,18 @@ def create_token():
     insert_query = f"INSERT INTO user_activity_log (user_no, user_name, action_type, meta_data) VALUES (%s, %s, %s, %s)"
     corsor_l.execute(insert_query, insert_tuple)
 
-    conn_a.commit()
     conn_l.commit()
 
+    response = make_response({"access_token":access_token, 'user_info': payload})
+    # response.headers['Access-Token'] = access_token
+    # expire_date = get_time_now()
+    # expire_date = expire_date + datetime.timedelta(days=1)
+    # response.set_cookie(
+    #     "access_token",value=access_token,expires=expire_date,path="/",samesite="Lax",
+    # )
+
     # return access token , refresh token
-    return refresh_access_token_response(access_token, refresh_token)
+    return response
 
 
 
@@ -96,6 +108,17 @@ def refresh_token():
 @app.route('/users', methods=['POST'])
 def create_users():
     rq = request.get_json()
+
+
+    decoded_token = decode_token(rq['access_token'])
+    if decoded_token == {} : return "Access Token is not valid",401
+    else : pass
+
+    # Check authentication level with access_token user_no 
+    user_authentication_level = decoded_token["authentication_level"] 
+    if user_authentication_level == 'admin' : pass
+    else : return "Invalid request",404 
+
     salt = get_salt()
     pw = sha256( rq['pw'] + salt )
 
@@ -115,9 +138,11 @@ def create_users():
     user_no = user[0] 
 
     # CJ_Websim_Member.profile insert 
-    insert_tuple = (user_no, rq['cell_phone'], rq['email'], rq['cj_world_account'], rq['authentication_level'])
-    insert_query = f"INSERT INTO profile (user_no, cell_phone, email, cj_world_account, authentication_level) VALUES (%d, %s, %s, %s, %s)"
+    insert_tuple = (user_no, rq['cell_phone'], rq['email'], rq['cj_world_account'], rq['authentication_level'], rq['name'])
+    insert_query = f"INSERT INTO profile (user_no, cell_phone, email, cj_world_account, authentication_level, user_name) VALUES (%d, %s, %s, %s, %s, %s)"
     corsor_m.execute(insert_query, insert_tuple)
+
+    conn_m.commit()
     
     # CJ_Websim_Auth.password insert
     insert_tuple = (user_no, salt, pw)
@@ -125,7 +150,7 @@ def create_users():
     corsor_a.execute(insert_query, insert_tuple)
 
     # commit db 
-    conn_m.commit()
+    
     conn_a.commit()
         
     return "User created", 201
@@ -143,19 +168,22 @@ def delete_users():
     else : return "Invalid request",404 
 
     #Delete CJ_Websim_Member.users => via ON DELTE cascade option, delete authomatically another table information
-    corsor_m.execute(f"DELETE FROM users WHERE user_no = ?", (rq['taget_user_no'],))
-    
+    corsor_m.execute(f"DELETE FROM users WHERE user_no = ?", (int( rq['target_user_no'] ),) )
+    conn_m.commit()
 
     #Log insert query for Delete user history
-    insert_tuple = (rq['taget_user_no'], decoded_token["user_name"] )
-    insert_query = f"INSERT INTO withdrawal_log (user_no, user_name) VALUES (%s)"
+    insert_tuple = (rq['target_user_no'], rq["target_user_name"] )
+    insert_query = f"INSERT INTO withdrawal_log (user_no, user_name) VALUES (%s, %s)"
     corsor_l.execute(insert_query, insert_tuple)
 
-    # commit db
-    conn_m.commit()
     conn_l.commit()
 
-    return "Delete user", 200
+    # join member.users, member.profile , return tuple array
+    corsor_m.execute(f"SELECT * FROM users INNER JOIN profile ON users.user_no = profile.user_no")
+    user_list = corsor_m.fetchall() # ( , , , )
+
+    return json.dumps({'user_list':user_list} , default=str)
+
 
 @app.route('/users', methods=['PUT'])
 def update_users():
@@ -172,13 +200,33 @@ def update_users():
     elif user_authentication_level == 'user' and decoded_token['user_no'] == rq['target_user_no'] : pass 
     else : return "Invalid request",404 
 
-    # update contetns confirm then write code
-    update_tuple = (rq['user_name'], rq['login_type'], rq['target_user_no'])
-    update_query = f"UPDATE profile set a = ?, b = ? WHERE user_no = ?"
+    if rq['update_target'] == 'email' :
+        update_tuple = ( rq['email'], rq['target_user_no'])
+        update_query = f"UPDATE profile set email = ? WHERE user_no = ?"
+    
+    elif rq['update_target'] == 'cell_phone' :
+        update_tuple = ( rq['cell_phone'], rq['target_user_no'])
+        update_query = f"UPDATE profile set cell_phone = ? WHERE user_no = ?"
 
-    return json.dumps()
+    elif rq['update_target'] == 'both' :
+        update_tuple = ( rq['email'], rq['cell_phone'], rq['target_user_no'])
+        update_query = f"UPDATE profile set email = ?, cell_phone = ? WHERE user_no = ?"
+    
+    else :
+        return "Invalid request",404  
 
-@app.route('/users', methods=['POST'])
+    corsor_m.execute(update_query, update_tuple)
+    conn_m.commit()
+
+
+    return json.dumps({"status":"update"})
+
+
+
+
+
+
+@app.route('/users/list', methods=['POST'])
 def read_users():
 
     rq = request.get_json()
@@ -196,7 +244,7 @@ def read_users():
     corsor_m.execute(f"SELECT * FROM users INNER JOIN profile ON users.user_no = profile.user_no")
     user_list = corsor_m.fetchall() # ( , , , )
 
-    return json.dumps({'user_list':user_list})
+    return json.dumps({'user_list':user_list} , default=str)
 
 #Log
 #------------------------------------------------------------#
@@ -215,7 +263,7 @@ def create_log():
 
     return json.dumps()
 
-@app.route('/log', methods=['POST'])
+@app.route('/log/list', methods=['POST'])
 def read_log():
     rq = request.get_json()
     decoded_token = decode_token(rq['access_token'])
@@ -236,12 +284,12 @@ def read_log():
         user_no = decoded_token["user_no"] 
         
         #return own log list
-        corsor_l.execute(f"SELECT * FROM user_activity_log where user_no = ?", (user_no))
+        corsor_l.execute(f"SELECT * FROM user_activity_log where user_no = ?", (user_no,))
         log_list = corsor_l.fetchall() 
     else :
         return "Invalid request",404 
 
-    return json.dumps({"log_list":log_list})
+    return json.dumps({"log_list":log_list}, default=str)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=20000)

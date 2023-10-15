@@ -3,6 +3,10 @@ import mariadb
 from .Database import *
 import datetime, jwt
 from flask import make_response,Flask, jsonify, request, render_template
+from pytz import timezone
+
+def get_time_now () :
+    return datetime.datetime.now(timezone('Asia/Seoul'))
 
 def get_salt () :
     ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -19,16 +23,15 @@ def get_db_conn (db_name):
     conn = mariadb.connect(user=DB_USER,password=DB_PASSWORD,host=DB_HOST,port=DB_PORT,database=db_name)
     return conn
 
-def create_token_per_type(payload = {'exp':datetime.datetime.utcnow() + datetime.timedelta(seconds = 24*60*60)}):
+def create_token_per_type(payload = {'exp':get_time_now() + datetime.timedelta(seconds = 24*60*60)}):
     encoded = jwt.encode(payload = payload,key = PRIVATE_KEY, algorithm = 'HS256')
-    token = encoded.decode('utf-8')
-    return token
+    return encoded.decode('utf-8')
 
 # token expire or invalid token then return {}
 def decode_token( token ):
     try :
         decoded_token = jwt.decode(token, PRIVATE_KEY, algorithms=['HS256'])
-        if decoded_token['exp'] < datetime.datetime.utcnow() : raise Exception("Token expired")
+        if decoded_token['exp'] < get_time_now().timestamp() : raise Exception("Token expired")
         return decoded_token
     except :
         return {}
@@ -41,8 +44,9 @@ def verify_token(access_token):
         return (decoded_token) 
 
 def refresh_access_token_response( access_token, refresh_token):
-    response_data = jsonify({"access_token" : access_token})
-    response = make_response(response_data)
+    
+    response = make_response()
+    response.headers['Access-Token'] = access_token.decode('utf-8')
     response.set_cookie(
         "refresh_token",value=refresh_token,max_age=24*60*60,path="/",samesite="Lax",
     )

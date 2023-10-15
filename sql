@@ -27,6 +27,7 @@ CREATE TABLE Profile (
     join_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     authentication_level VARCHAR(20) NOT NULL, -- 'User'/'Admin'
+    user_name VARCHAR(128), -- base64 encryt
     FOREIGN KEY(user_no) REFERENCES CJ_Websim_Member.Users(user_no) ON DELETE CASCADE
 );
 
